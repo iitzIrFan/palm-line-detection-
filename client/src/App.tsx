@@ -7,12 +7,24 @@ interface LineData {
   y1: number;
   x2: number;
   y2: number;
+  confidence?: number;
   description: string;
-  // Optional: If backend provides palm bounding box
-  palmX?: number;
-  palmY?: number;
-  palmWidth?: number;
-  palmHeight?: number;
+}
+
+interface FingertipData {
+  name: string;
+  x: number;
+  y: number;
+  confidence: number;
+  description: string;
+}
+
+interface AnalysisData {
+  personality: string;
+  strengths: string[];
+  challenges: string[];
+  starseed: string;
+  overall: string;
 }
 
 function App() {
@@ -20,6 +32,8 @@ function App() {
   const [stepIndex, setStepIndex] = useState(0);
   const [image, setImage] = useState<string | null>(null);
   const [lines, setLines] = useState<LineData[]>([]);
+  const [fingertips, setFingertips] = useState<FingertipData[]>([]);
+  const [analysis, setAnalysis] = useState<AnalysisData | null>(null);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -69,9 +83,13 @@ function App() {
       const data = await res.json();
       if (!data.success) return setStage("error");
 
-      setLines(data.lines);
+      setLines(data.lines || []);
+      setFingertips(data.fingertips || []);
+      setAnalysis(data.analysis || null);
 
-      for (let i = 1; i <= data.lines.length; i++) {
+      // Animate through detection steps
+      const totalItems = (data.lines?.length || 0) + (data.fingertips?.length || 0);
+      for (let i = 1; i <= totalItems; i++) {
         setStepIndex(i);
         await new Promise((r) => setTimeout(r, 800));
       }
@@ -82,9 +100,9 @@ function App() {
     }
   };
 
-  /** ✅ Draw Image + Lines Correctly */
+  /** ✅ Draw Image + Lines + Fingertips Correctly */
   useEffect(() => {
-    if (stage === "result" && image && lines.length > 0 && canvasRef.current) {
+    if (stage === "result" && image && (lines.length > 0 || fingertips.length > 0) && canvasRef.current) {
       const canvas = canvasRef.current;
       const ctx = canvas.getContext("2d")!;
       const baseImg = new Image();
@@ -100,20 +118,7 @@ function App() {
         const scaleX = canvas.width / baseImg.width;
         const scaleY = canvas.height / baseImg.height;
 
-        // Optional: Clip to palm area if backend provides bounding box
-        const palm = lines[0]; // assume bounding box from first line (update if available)
-        if (palm.palmWidth && palm.palmHeight) {
-          ctx.save();
-          ctx.beginPath();
-          ctx.rect(
-            palm.palmX! * scaleX,
-            palm.palmY! * scaleY,
-            palm.palmWidth! * scaleX,
-            palm.palmHeight! * scaleY
-          );
-          ctx.clip();
-        }
-
+        // Draw palm lines
         lines.forEach((line, idx) => {
           setTimeout(() => {
             const x1 = line.x1 * scaleX;
@@ -122,46 +127,91 @@ function App() {
             const y2 = line.y2 * scaleY;
 
             const gradient = ctx.createLinearGradient(x1, y1, x2, y2);
-            gradient.addColorStop(0, "red");
-            gradient.addColorStop(0.5, "blue");
-            gradient.addColorStop(1, "green");
+            const color = getColor(line.class);
+            gradient.addColorStop(0, color);
+            gradient.addColorStop(0.5, `${color}80`); // Semi-transparent (50% opacity)
+            gradient.addColorStop(1, color);
+            
             ctx.strokeStyle = gradient;
-            ctx.lineWidth = 3;
+            ctx.lineWidth = 4;
+            ctx.lineCap = 'round';
 
             ctx.beginPath();
             ctx.moveTo(x1, y1);
             ctx.lineTo(x2, y2);
             ctx.stroke();
 
-            ctx.font = "14px Arial";
+            // Line label
+            ctx.font = "bold 14px Arial";
             ctx.fillStyle = "white";
-            ctx.fillText(line.class, x1, y1 - 10);
+            ctx.strokeStyle = "black";
+            ctx.lineWidth = 2;
+            ctx.strokeText(line.class.replace('_', ' '), x1 + 5, y1 - 10);
+            ctx.fillText(line.class.replace('_', ' '), x1 + 5, y1 - 10);
           }, idx * 500);
         });
 
-        if (palm.palmWidth && palm.palmHeight) {
-          ctx.restore(); // remove clipping after drawing
-        }
+        // Draw fingertips
+        fingertips.forEach((fingertip, idx) => {
+          setTimeout(() => {
+            const x = fingertip.x * scaleX;
+            const y = fingertip.y * scaleY;
+
+            // Draw fingertip circle
+            ctx.beginPath();
+            ctx.arc(x, y, 12, 0, 2 * Math.PI);
+            ctx.fillStyle = getFingertipColor(fingertip.name);
+            ctx.fill();
+            ctx.strokeStyle = "white";
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Fingertip label
+            ctx.font = "bold 12px Arial";
+            ctx.fillStyle = "white";
+            ctx.strokeStyle = "black";
+            ctx.lineWidth = 2;
+            ctx.strokeText(fingertip.name, x - 15, y + 25);
+            ctx.fillText(fingertip.name, x - 15, y + 25);
+          }, (lines.length + idx) * 500);
+        });
       };
 
       baseImg.src = image;
     }
-  }, [stage, image, lines]);
+  }, [stage, image, lines, fingertips]);
 
   const getColor = (lineClass: string) => {
     switch (lineClass) {
       case "heart_line":
-        return "red";
+        return "#FF6B6B"; // Red
       case "head_line":
-        return "blue";
+        return "#4ECDC4"; // Teal
       case "life_line":
-        return "green";
+        return "#45B7D1"; // Blue
       case "fate_line":
-        return "orange";
+        return "#FFA726"; // Orange
       case "sun_line":
-        return "purple";
+        return "#AB47BC"; // Purple
       default:
-        return "#fff";
+        return "#FFFFFF"; // White - full 6-character hex
+    }
+  };
+
+  const getFingertipColor = (fingerName: string) => {
+    switch (fingerName) {
+      case "thumb":
+        return "#E91E63"; // Pink
+      case "index":
+        return "#2196F3"; // Blue
+      case "middle":
+        return "#4CAF50"; // Green
+      case "ring":
+        return "#FF9800"; // Orange
+      case "pinky":
+        return "#9C27B0"; // Purple
+      default:
+        return "#607D8B"; // Blue Grey
     }
   };
 
@@ -183,11 +233,15 @@ function App() {
 
       {stage === "analyzing" && (
         <div className="card">
-          <h2>Analyzing {lines[stepIndex - 1]?.class.replace("_", " ") || "..."}</h2>
+          <h2>Analyzing {
+            stepIndex <= lines.length 
+              ? lines[stepIndex - 1]?.class.replace("_", " ") || "palm lines" 
+              : fingertips[stepIndex - lines.length - 1]?.name + " fingertip" || "fingertips"
+          }</h2>
           <div className="progress-bar">
             <div
               className="progress"
-              style={{ width: `${(stepIndex / lines.length) * 100}%` }}
+              style={{ width: `${(stepIndex / (lines.length + fingertips.length)) * 100}%` }}
             />
           </div>
         </div>
@@ -196,14 +250,58 @@ function App() {
       {stage === "result" && (
         <div className="card">
           <h2>✨ Your Palm Reading</h2>
-          <canvas ref={canvasRef} style={{ maxWidth: "100%", height: "auto" }} />
+          <canvas ref={canvasRef} style={{ maxWidth: "100%", height: "auto", marginBottom: "20px" }} />
+          
           <div className="results">
-            {lines.map((line, idx) => (
-              <p key={idx}>
-                <strong>{line.class.replace("_", " ")}:</strong> {line.description}
-              </p>
-            ))}
+            <div className="analysis-section">
+              <h3>🔮 Palm Lines Detected</h3>
+              {lines.map((line, idx) => (
+                <p key={idx} style={{ color: getColor(line.class) }}>
+                  <strong>{line.class.replace("_", " ")}:</strong> {line.description}
+                </p>
+              ))}
+            </div>
+
+            {fingertips.length > 0 && (
+              <div className="analysis-section">
+                <h3>👆 Fingertips Analysis</h3>
+                {fingertips.map((fingertip, idx) => (
+                  <p key={idx} style={{ color: getFingertipColor(fingertip.name) }}>
+                    <strong>{fingertip.name} finger:</strong> {fingertip.description}
+                  </p>
+                ))}
+              </div>
+            )}
+
+            {analysis && (
+              <div className="analysis-section">
+                <h3>🌟 Personality Analysis</h3>
+                <p>{analysis.personality}</p>
+                
+                {analysis.strengths.length > 0 && (
+                  <div>
+                    <h4>Your Strengths:</h4>
+                    <ul>
+                      {analysis.strengths.map((strength, idx) => (
+                        <li key={idx}>{strength}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                <div className="starseed-section">
+                  <h3>✨ Starseed Reading</h3>
+                  <p>{analysis.starseed}</p>
+                </div>
+
+                <div className="overall-section">
+                  <h3>🎯 Overall Analysis</h3>
+                  <p>{analysis.overall}</p>
+                </div>
+              </div>
+            )}
           </div>
+          
           <button onClick={() => setStage("camera")}>🔁 Try Again</button>
         </div>
       )}
