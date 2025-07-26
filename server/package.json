@@ -15,8 +15,16 @@
     "axios": "^1.11.0",
     "canvas": "^3.1.2",
     "cors": "^2.8.5",
+    "dotenv": "^17.2.1",
     "express": "^5.1.0",
+    "helmet": "^8.1.0",
+    "jimp": "^1.6.0",
     "jsdom": "^26.1.0",
     "opencv.js": "^1.2.1"
+  },
+  "devDependencies": {
+    "jest": "^30.0.5",
+    "nodemon": "^3.1.10",
+    "supertest": "^7.1.4"
   }
 }
