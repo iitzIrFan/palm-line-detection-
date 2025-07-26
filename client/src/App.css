@@ -102,10 +102,51 @@ video, canvas {
 
 .results p {
   margin-bottom: 10px;
+  line-height: 1.5;
 }
 
 .results strong {
   color: #ffd700;
+}
+
+.analysis-section {
+  margin-bottom: 20px;
+  padding: 15px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+  border-left: 4px solid #ffd700;
+}
+
+.analysis-section h3 {
+  color: #ffd700;
+  margin-bottom: 10px;
+  font-size: 1.1rem;
+}
+
+.analysis-section h4 {
+  color: #ffeb3b;
+  margin: 10px 0 5px 0;
+  font-size: 0.95rem;
+}
+
+.analysis-section ul {
+  margin-left: 20px;
+  margin-top: 5px;
+}
+
+.analysis-section li {
+  margin-bottom: 3px;
+  color: rgba(255,255,255,0.85);
+}
+
+.starseed-section {
+  background: linear-gradient(135deg, rgba(138, 43, 226, 0.2), rgba(72, 61, 139, 0.2));
+  border-left-color: #8a2be2;
+}
+
+.overall-section {
+  background: linear-gradient(135deg, rgba(255, 215, 0, 0.2), rgba(255, 140, 0, 0.2));
+  border-left-color: #ffd700;
 }
 
 button {

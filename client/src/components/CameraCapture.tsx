@@ -33,9 +33,10 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onComplete }) => {
 
             // Proceed with analysis
             await analyzePalm(imageSrc, predictions[0].landmarks);
+            setMessage('Analysis complete!');
 
         } catch (error: unknown) {
-            setMessage(error instanceof Error ? error.message : 'Unknown error');
+            setMessage(error instanceof Error ? error.message : 'Analysis failed. Please try again.');
         } finally {
             setIsAnalyzing(false);
         }
@@ -43,22 +44,38 @@ const CameraCapture: React.FC<CameraCaptureProps> = ({ onComplete }) => {
 
     const analyzePalm = async (imageSrc: string, landmarks: any) => {
         // Send to backend for detailed analysis
-        setMessage('Analyzing...');
+        setMessage('Analyzing palm lines and fingertips...');
 
-        const response = await fetch('/api/analyze', {
-            method: 'POST',
-            body: JSON.stringify({ image: imageSrc, landmarks }),
-            headers: { 'Content-Type': 'application/json' }
-        });
+        try {
+            const response = await fetch('http://localhost:3001/api/analyze', {
+                method: 'POST',
+                body: JSON.stringify({ image: imageSrc, landmarks }),
+                headers: { 'Content-Type': 'application/json' }
+            });
 
-        const result = await response.json();
-        renderPalmAnalysis(result);
-    };
+            if (!response.ok) {
+                throw new Error('Analysis failed');
+            }
 
-    const renderPalmAnalysis = (result: any) => {
-        // Render the analysis with lines and dots
-        setMessage('Analysis complete');
-        // Implementation details below...
+            const result = await response.json();
+            
+            if (!result.success) {
+                throw new Error(result.message || 'Analysis failed');
+            }
+
+            // Pass the complete result to parent component
+            onComplete({
+                image: imageSrc,
+                lines: result.lines || [],
+                fingertips: result.fingertips || [],
+                analysis: result.analysis || null,
+                insights: result.insights || result.analysis // Backward compatibility
+            });
+
+        } catch (error) {
+            setMessage(error instanceof Error ? error.message : 'Analysis failed');
+            throw error;
+        }
     };
 
     return (
