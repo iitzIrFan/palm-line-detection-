@@ -413,21 +413,10 @@ function App() {
     setStage("analyzing");
     setStepIndex(0);
     try {
-      // Get image dimensions for better server processing
-      const tempImage = new Image();
-      await new Promise((resolve) => {
-        tempImage.onload = resolve;
-        tempImage.src = img;
-      });
-
       const res = await fetch("http://localhost:3001/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          image: img,
-          imageWidth: tempImage.width,
-          imageHeight: tempImage.height 
-        }),
+        body: JSON.stringify({ image: img }),
       });
 
       const data = await res.json();
@@ -441,7 +430,7 @@ function App() {
       const totalItems = (data.lines?.length || 0) + (data.fingertips?.length || 0);
       for (let i = 1; i <= totalItems; i++) {
         setStepIndex(i);
-        await new Promise((r) => setTimeout(r, 600)); // Faster animation
+        await new Promise((r) => setTimeout(r, 800));
       }
 
       setStage("result");
@@ -458,24 +447,17 @@ function App() {
       const baseImg = new Image();
 
       baseImg.onload = () => {
-        // Set canvas to match the display size but maintain aspect ratio
-        const displayWidth = canvas.offsetWidth;
-        const aspectRatio = baseImg.height / baseImg.width;
-        const displayHeight = displayWidth * aspectRatio;
-        
+        // Resize canvas to actual image size
         canvas.width = baseImg.width;
         canvas.height = baseImg.height;
-        canvas.style.width = displayWidth + 'px';
-        canvas.style.height = displayHeight + 'px';
 
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(baseImg, 0, 0, baseImg.width, baseImg.height);
 
-        // No scaling needed since we're using actual image coordinates
-        const scaleX = 1;
-        const scaleY = 1;
+        const scaleX = canvas.width / baseImg.width;
+        const scaleY = canvas.height / baseImg.height;
 
-        // Draw palm lines with animation
+        // Draw palm lines
         lines.forEach((line, idx) => {
           setTimeout(() => {
             const x1 = line.x1 * scaleX;
@@ -483,71 +465,54 @@ function App() {
             const x2 = line.x2 * scaleX;
             const y2 = line.y2 * scaleY;
 
-            // Create a more visible gradient
             const gradient = ctx.createLinearGradient(x1, y1, x2, y2);
             const color = getColor(line.class);
             gradient.addColorStop(0, color);
-            gradient.addColorStop(0.5, color + 'CC'); // More opaque
+            gradient.addColorStop(0.5, `${color}80`); // Semi-transparent (50% opacity)
             gradient.addColorStop(1, color);
             
             ctx.strokeStyle = gradient;
-            ctx.lineWidth = 6; // Thicker lines for better visibility
+            ctx.lineWidth = 4;
             ctx.lineCap = 'round';
-            ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
-            ctx.shadowBlur = 4;
 
             ctx.beginPath();
             ctx.moveTo(x1, y1);
             ctx.lineTo(x2, y2);
             ctx.stroke();
 
-            // Reset shadow
-            ctx.shadowColor = 'transparent';
-            ctx.shadowBlur = 0;
-
-            // Line label with better visibility
-            ctx.font = "bold 16px Inter, Arial";
+            // Line label
+            ctx.font = "bold 14px Arial";
             ctx.fillStyle = "white";
-            ctx.strokeStyle = "rgba(0, 0, 0, 0.8)";
-            ctx.lineWidth = 3;
-            const labelText = line.class.replace('_', ' ').toUpperCase();
-            ctx.strokeText(labelText, x1 + 10, y1 - 15);
-            ctx.fillText(labelText, x1 + 10, y1 - 15);
-          }, idx * 300); // Faster animation
+            ctx.strokeStyle = "black";
+            ctx.lineWidth = 2;
+            ctx.strokeText(line.class.replace('_', ' '), x1 + 5, y1 - 10);
+            ctx.fillText(line.class.replace('_', ' '), x1 + 5, y1 - 10);
+          }, idx * 500);
         });
 
-        // Draw fingertips with animation
+        // Draw fingertips
         fingertips.forEach((fingertip, idx) => {
           setTimeout(() => {
             const x = fingertip.x * scaleX;
             const y = fingertip.y * scaleY;
 
-            // Draw fingertip circle with shadow
-            ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
-            ctx.shadowBlur = 6;
-            
+            // Draw fingertip circle
             ctx.beginPath();
-            ctx.arc(x, y, 15, 0, 2 * Math.PI); // Larger circles
+            ctx.arc(x, y, 12, 0, 2 * Math.PI);
             ctx.fillStyle = getFingertipColor(fingertip.name);
             ctx.fill();
             ctx.strokeStyle = "white";
-            ctx.lineWidth = 3;
+            ctx.lineWidth = 2;
             ctx.stroke();
 
-            // Reset shadow
-            ctx.shadowColor = 'transparent';
-            ctx.shadowBlur = 0;
-
-            // Fingertip label with better positioning
-            ctx.font = "bold 14px Inter, Arial";
+            // Fingertip label
+            ctx.font = "bold 12px Arial";
             ctx.fillStyle = "white";
-            ctx.strokeStyle = "rgba(0, 0, 0, 0.8)";
+            ctx.strokeStyle = "black";
             ctx.lineWidth = 2;
-            const labelText = fingertip.name.toUpperCase();
-            const textWidth = ctx.measureText(labelText).width;
-            ctx.strokeText(labelText, x - textWidth / 2, y + 35);
-            ctx.fillText(labelText, x - textWidth / 2, y + 35);
-          }, (lines.length * 300) + (idx * 200)); // Stagger after lines
+            ctx.strokeText(fingertip.name, x - 15, y + 25);
+            ctx.fillText(fingertip.name, x - 15, y + 25);
+          }, (lines.length + idx) * 500);
         });
       };
 
@@ -558,26 +523,26 @@ function App() {
   const getColor = (lineClass: string) => {
     switch (lineClass) {
       case "heart_line":
-        return "#FF1744"; // Bright Red
+        return "#FF6B6B"; // Red
       case "head_line":
-        return "#00E676"; // Bright Green
+        return "#4ECDC4"; // Teal
       case "life_line":
-        return "#2979FF"; // Bright Blue
+        return "#45B7D1"; // Blue
       case "fate_line":
-        return "#FF9100"; // Bright Orange
+        return "#FFA726"; // Orange
       case "sun_line":
-        return "#E91E63"; // Bright Pink
+        return "#AB47BC"; // Purple
       default:
-        return "#FFFFFF"; // White
+        return "#FFFFFF"; // White - full 6-character hex
     }
   };
 
   const getFingertipColor = (fingerName: string) => {
     switch (fingerName) {
       case "thumb":
-        return "#FF5722"; // Deep Orange
+        return "#E91E63"; // Pink
       case "index":
-        return "#3F51B5"; // Indigo
+        return "#2196F3"; // Blue
       case "middle":
         return "#4CAF50"; // Green
       case "ring":
@@ -666,17 +631,6 @@ function App() {
                           <ul>
                             {analysis.strengths.map((strength, idx) => (
                               <li key={idx}>{strength}</li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-
-                      {analysis.challenges.length > 0 && (
-                        <div>
-                          <h4>Areas for Growth:</h4>
-                          <ul>
-                            {analysis.challenges.map((challenge, idx) => (
-                              <li key={idx}>{challenge}</li>
                             ))}
                           </ul>
                         </div>
